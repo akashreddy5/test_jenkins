@@ -1,5 +1,3 @@
-// Jenkinsfile
-
 pipeline {
     agent any
 
@@ -8,7 +6,7 @@ pipeline {
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
-        BRANCH_NAME = "${env.BRANCH_NAME ?: 'develop'}"
+        // Removed dynamic BRANCH_NAME assignment
     }
 
     tools {
@@ -37,7 +35,8 @@ pipeline {
         stage('SonarQube Analysis') {
             when {
                 expression {
-                    return env.BRANCH_NAME == 'develop' || env.BRANCH_NAME?.startsWith('feature/')
+                    def branch = env.BRANCH_NAME ?: ''
+                    return branch == 'develop' || branch.startsWith('feature/')
                 }
             }
             steps {
@@ -61,8 +60,8 @@ pipeline {
                 }
             }
             steps {
-                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
-                    sh "aws s3 sync build/ s3://${S3_BUCKET_DEV} --delete"
+                withAWS(region: "${env.AWS_REGION}", credentials: 'aws-credentials') {
+                    sh "aws s3 sync build/ s3://${env.S3_BUCKET_DEV} --delete"
                 }
             }
         }
@@ -74,8 +73,8 @@ pipeline {
                 }
             }
             steps {
-                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
-                    sh "aws s3 sync build/ s3://${S3_BUCKET_PROD} --delete"
+                withAWS(region: "${env.AWS_REGION}", credentials: 'aws-credentials') {
+                    sh "aws s3 sync build/ s3://${env.S3_BUCKET_PROD} --delete"
                 }
             }
         }
