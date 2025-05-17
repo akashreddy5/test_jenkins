@@ -4,13 +4,13 @@ pipeline {
     
     environment {
         AWS_REGION = 'us-east-1' // Change to your AWS region
-        S3_BUCKET_DEV = 'my-react-app-dev' // Change to your dev bucket name
-        S3_BUCKET_PROD = 'my-react-app-prod' // Change to your prod bucket name
-        SONAR_SERVER = 'http://sonarqube-server:9000' // Change to your SonarQube server URL
+        S3_BUCKET_DEV = 'my-react-app-devs' // Change to your dev bucket name
+        S3_BUCKET_PROD = 'my-react-app-prods' // Change to your prod bucket name
+        SONAR_SERVER = 'http://18.212.218.156:9000/projects' // Change to your SonarQube server URL
     }
     
     tools {
-        nodejs 'Node16' // Use the Node.js installation defined in Jenkins
+        nodejs 'Node24' // Use the Node.js installation defined in Jenkins
     }
     
     stages {
@@ -61,7 +61,7 @@ pipeline {
             steps {
                 withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
                     sh "aws s3 sync build/ s3://${S3_BUCKET_DEV} --delete"
-                    sh "aws cloudfront create-invalidation --distribution-id \${DEV_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
+                    // sh "aws cloudfront create-invalidation --distribution-id \${DEV_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
                 }
             }
         }
@@ -75,7 +75,7 @@ pipeline {
             steps {
                 withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
                     sh "aws s3 sync build/ s3://${S3_BUCKET_PROD} --delete"
-                    sh "aws cloudfront create-invalidation --distribution-id \${PROD_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
+                    // sh "aws cloudfront create-invalidation --distribution-id \${PROD_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
                 }
             }
         }
