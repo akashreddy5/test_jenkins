@@ -4,15 +4,15 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1' // Change to your AWS region
-        S3_BUCKET_DEV = 'my-react-app-devs' // Dev bucket
-        S3_BUCKET_PROD = 'my-react-app-prods' // Prod bucket
-        SONAR_SERVER = 'http://18.212.218.156:9000/projects' // Optional
-        BRANCH_NAME = "${env.BRANCH_NAME ?: 'develop'}" // Fallback if not set
+        AWS_REGION = 'us-east-1'
+        S3_BUCKET_DEV = 'my-react-app-devs'
+        S3_BUCKET_PROD = 'my-react-app-prods'
+        SONAR_SERVER = 'http://18.212.218.156:9000/projects'
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'develop'}"
     }
 
     tools {
-        nodejs 'Node24' // Jenkins-defined Node.js tool
+        nodejs 'Node24'
     }
 
     stages {
@@ -63,7 +63,33 @@ pipeline {
             steps {
                 withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
                     sh "aws s3 sync build/ s3://${S3_BUCKET_DEV} --delete"
-                    // Uncomment below if using CloudFront
-                    // sh "aws cloudfront create-invalidation --distribution-id ${DEV_DISTRIBUTION_ID} --paths '/*'"
                 }
             }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                expression {
+                    return ['main', 'master'].contains(env.BRANCH_NAME)
+                }
+            }
+            steps {
+                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
+                    sh "aws s3 sync build/ s3://${S3_BUCKET_PROD} --delete"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Build completed successfully!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}
