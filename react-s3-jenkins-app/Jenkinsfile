@@ -1,41 +1,43 @@
 // Jenkinsfile
+
 pipeline {
     agent any
-    
+
     environment {
         AWS_REGION = 'us-east-1' // Change to your AWS region
-        S3_BUCKET_DEV = 'my-react-app-devs' // Change to your dev bucket name
-        S3_BUCKET_PROD = 'my-react-app-prods' // Change to your prod bucket name
-        SONAR_SERVER = 'http://18.212.218.156:9000/projects' // Change to your SonarQube server URL
+        S3_BUCKET_DEV = 'my-react-app-devs' // Dev bucket
+        S3_BUCKET_PROD = 'my-react-app-prods' // Prod bucket
+        SONAR_SERVER = 'http://18.212.218.156:9000/projects' // Optional
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'develop'}" // Fallback if not set
     }
-    
+
     tools {
-        nodejs 'Node24' // Use the Node.js installation defined in Jenkins
+        nodejs 'Node24' // Jenkins-defined Node.js tool
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
+
         stage('Install Dependencies') {
             steps {
                 sh 'npm install'
             }
         }
-        
+
         stage('Run Tests') {
             steps {
                 sh 'npm test -- --coverage'
             }
         }
-        
+
         stage('SonarQube Analysis') {
             when {
-                expression { 
-                    return env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'feature/*' 
+                expression {
+                    return env.BRANCH_NAME == 'develop' || env.BRANCH_NAME?.startsWith('feature/')
                 }
             }
             steps {
@@ -45,51 +47,23 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build') {
             steps {
                 sh 'npm run build'
             }
         }
-        
+
         stage('Deploy to Dev') {
             when {
-                expression { 
-                    return env.BRANCH_NAME == 'develop' 
+                expression {
+                    return env.BRANCH_NAME == 'develop'
                 }
             }
             steps {
                 withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
                     sh "aws s3 sync build/ s3://${S3_BUCKET_DEV} --delete"
-                    // sh "aws cloudfront create-invalidation --distribution-id \${DEV_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
+                    // Uncomment below if using CloudFront
+                    // sh "aws cloudfront create-invalidation --distribution-id ${DEV_DISTRIBUTION_ID} --paths '/*'"
                 }
             }
-        }
-        
-        stage('Deploy to Production') {
-            when {
-                expression { 
-                    return env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master' 
-                }
-            }
-            steps {
-                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
-                    sh "aws s3 sync build/ s3://${S3_BUCKET_PROD} --delete"
-                    // sh "aws cloudfront create-invalidation --distribution-id \${PROD_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
-                }
-            }
-        }
-    }
-    
-    post {
-        always {
-            cleanWs()
-        }
-        success {
-            echo 'Build completed successfully!'
-        }
-        failure {
-            echo 'Build failed!'
-        }
-    }
-}
