@@ -1,0 +1,95 @@
+// Jenkinsfile
+pipeline {
+    agent any
+    
+    environment {
+        AWS_REGION = 'us-east-1' // Change to your AWS region
+        S3_BUCKET_DEV = 'my-react-app-dev' // Change to your dev bucket name
+        S3_BUCKET_PROD = 'my-react-app-prod' // Change to your prod bucket name
+        SONAR_SERVER = 'http://sonarqube-server:9000' // Change to your SonarQube server URL
+    }
+    
+    tools {
+        nodejs 'Node16' // Use the Node.js installation defined in Jenkins
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                sh 'npm test -- --coverage'
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            when {
+                expression { 
+                    return env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'feature/*' 
+                }
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'npm run test -- --coverage'
+                    sh 'sonar-scanner'
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+        
+        stage('Deploy to Dev') {
+            when {
+                expression { 
+                    return env.BRANCH_NAME == 'develop' 
+                }
+            }
+            steps {
+                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
+                    sh "aws s3 sync build/ s3://${S3_BUCKET_DEV} --delete"
+                    sh "aws cloudfront create-invalidation --distribution-id \${DEV_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
+                }
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                expression { 
+                    return env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master' 
+                }
+            }
+            steps {
+                withAWS(region: "${AWS_REGION}", credentials: 'aws-credentials') {
+                    sh "aws s3 sync build/ s3://${S3_BUCKET_PROD} --delete"
+                    sh "aws cloudfront create-invalidation --distribution-id \${PROD_DISTRIBUTION_ID} --paths '/*'" // Optional: If using CloudFront
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Build completed successfully!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}
