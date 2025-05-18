@@ -15,7 +15,7 @@ pipeline {
         // Get branch name safely
         BRANCH_NAME = "${env.BRANCH_NAME ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()}"
         // Set Node.js and npm executables path (combined into one PATH declaration)
-        PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Node16'}/bin:${env.PATH}"
+        PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         // Set npm cache directory in workspace to avoid permission issues
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
