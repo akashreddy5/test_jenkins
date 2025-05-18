@@ -17,7 +17,8 @@ pipeline {
     }
 
     tools {
-        nodejs 'Nodejs'
+        nodejs 'Nodejs' // Node.js installation
+        sonarScanner 'SonarScanner' // SonarQube scanner tool defined in Jenkins
     }
 
     stages {
