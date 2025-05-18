@@ -11,7 +11,7 @@ pipeline {
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
         SONAR_HOST_URL = 'http://18.212.218.156:9000'
-        BRANCH_NAME = 'develop' // Default value; updated dynamically later
+        BRANCH_NAME = 'develop'
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
@@ -31,7 +31,6 @@ pipeline {
                 sh 'mkdir -p ${WORKSPACE}/.npm-cache'
                 sh 'node --version'
                 sh 'npm --version'
-                sh 'env | sort'
                 sh 'npm cache clean --force'
 
                 sh '''
@@ -78,19 +77,20 @@ pipeline {
                 expression { env.BRANCH_NAME == 'develop' }
             }
             environment {
-                SONAR_TOKEN = credentials('sonar') // Credential ID for SonarQube token
+                SONAR_TOKEN = credentials('sonar') // This should be defined in Jenkins credentials
             }
             steps {
                 echo "Running SonarQube analysis on branch: ${env.BRANCH_NAME}"
                 withSonarQubeEnv('MySonarQubeServer') {
-                    withEnv(["PATH+SONAR_SCANNER=${tool 'SonarScanner'}/bin"]) {
-                        sh '''
-                            sonar-scanner \
+                    script {
+                        def scannerHome = tool 'SonarScanner'
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
                               -Dsonar.projectKey=my-react-app \
                               -Dsonar.sources=. \
                               -Dsonar.host.url=${SONAR_HOST_URL} \
                               -Dsonar.login=${SONAR_TOKEN}
-                        '''
+                        """
                     }
                 }
             }
@@ -109,7 +109,6 @@ pipeline {
                         fi
                     fi
                 '''
-
                 sh '''
                     export CI=false
                     npm run build || npx react-scripts build
