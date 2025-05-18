@@ -11,7 +11,7 @@ pipeline {
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
-        BRANCH_NAME = 'main' // Will be set dynamically in Setup
+        BRANCH_NAME = 'main' // Will be set dynamically
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
@@ -28,18 +28,12 @@ pipeline {
                     echo "Branch Name Detected: ${env.BRANCH_NAME}"
                 }
 
-                // Create cache directories
                 sh 'mkdir -p ${WORKSPACE}/.npm-cache'
-
-                // Display environment info for debugging
                 sh 'node --version'
                 sh 'npm --version'
                 sh 'env | sort'
-
-                // Clear npm cache to avoid corrupted packages
                 sh 'npm cache clean --force'
 
-                // Check if package.json exists, create a basic one if it doesn't
                 sh '''
                     if [ ! -f package.json ]; then
                         echo "No package.json found, initializing a basic React project"
@@ -79,6 +73,20 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            when {
+                expression { env.BRANCH_NAME == 'develop' }
+            }
+            steps {
+                echo "Running SonarQube analysis on branch: ${env.BRANCH_NAME}"
+                // Replace with actual sonar-scanner command and credentials
+                sh '''
+                    echo "Pretending to run sonar-scanner..."
+                    # sonar-scanner -Dsonar.projectKey=my-react-app -Dsonar.sources=. -Dsonar.host.url=${SONAR_SERVER} -Dsonar.login=<SONAR_TOKEN>
+                '''
+            }
+        }
+
         stage('Build') {
             steps {
                 sh '''
@@ -102,9 +110,7 @@ pipeline {
 
         stage('Deploy to Dev') {
             when {
-                expression {
-                    return sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim() == 'develop'
-                }
+                expression { env.BRANCH_NAME == 'develop' }
             }
             steps {
                 withAWS(region: "${env.AWS_REGION}", credentials: 'aws-credentials') {
@@ -116,10 +122,7 @@ pipeline {
 
         stage('Deploy to Production') {
             when {
-                expression {
-                    def branch = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-                    return branch == 'main' || branch == 'master'
-                }
+                expression { env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master' }
             }
             steps {
                 withAWS(region: "${env.AWS_REGION}", credentials: 'aws-credentials') {
@@ -128,7 +131,6 @@ pipeline {
                 }
             }
         }
-
     }
 
     post {
