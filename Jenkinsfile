@@ -18,7 +18,7 @@ pipeline {
 
     tools {
         nodejs 'Nodejs' // Node.js installation
-        sonarScanner 'SonarScanner' // SonarQube scanner tool defined in Jenkins
+        tool name: 'SonarQube Scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation' // Correct SonarQube scanner tool type
     }
 
     stages {
