@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     options {
-        // Set aggressive timeout values
         timeout(time: 120, unit: 'MINUTES')
         // Add JVM property for the JENKINS-48300 issue directly to Jenkins startup
         // This needs to be added to Jenkins startup options: -Dorg.jenkinsci.plugins.durabletask.BourneShellScript.HEARTBEAT_CHECK_INTERVAL=86400
@@ -16,42 +15,45 @@ pipeline {
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
         // Get branch name safely
         BRANCH_NAME = "${env.BRANCH_NAME ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()}"
-        // Set Node.js environment variables
-        PATH = "${tool 'Node12'}/bin:${env.PATH}"
-        // Make npm install react-scripts globally
-        NPM_CONFIG_PREFIX = "${WORKSPACE}/.npm-global"
+        // Set Node.js environment variables - Updated to Node 16
+        PATH = "${tool 'Node16'}/bin:${env.PATH}"
+        // Make npm use local node_modules/.bin for executables first
+        PATH = "${WORKSPACE}/node_modules/.bin:${env.PATH}"
+        // Set npm cache directory in workspace to avoid permission issues
+        NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
 
     tools {
-        nodejs 'Node12'
+        nodejs 'Node16'  // Updated to Node 16
     }
 
     stages {
         stage('Setup') {
             steps {
-                // Create directory for global npm packages
-                sh 'mkdir -p ${WORKSPACE}/.npm-global'
+                // Create cache directories
+                sh 'mkdir -p ${WORKSPACE}/.npm-cache'
                 
                 // Display environment info for debugging
                 sh 'node --version'
                 sh 'npm --version'
                 sh 'env | sort'
+                
+                // Clear npm cache to avoid corrupted packages
+                sh 'npm cache clean --force'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                // Install react-scripts globally first to avoid issues
-                sh 'npm install -g react-scripts'
-                
-                // Install project dependencies, with retry
-                retry(2) {
+                // Install project dependencies with retry and network timeout
+                retry(3) {
                     sh '''
-                        npm ci || npm install --no-optional
+                        # Use npm ci if possible, fall back to install with increased network timeout
+                        npm ci --prefer-offline --no-audit --no-fund --network-timeout=60000 || 
+                        npm install --no-audit --no-fund --network-timeout=60000
+                        
                         # Verify node_modules exists
                         test -d node_modules || exit 1
-                        # Verify react-scripts is available
-                        node -e "require.resolve('react-scripts/package.json')" || npm install react-scripts
                     '''
                 }
             }
@@ -75,7 +77,8 @@ pipeline {
             steps {
                 // Use env.CI=false to prevent treating warnings as errors
                 sh '''
-                    CI=false npm run build || node_modules/.bin/react-scripts build
+                    export CI=false
+                    npm run build
                 '''
             }
         }
@@ -113,6 +116,10 @@ pipeline {
         always {
             // Archive build artifacts before cleaning workspace
             archiveArtifacts artifacts: 'build/**/*', allowEmptyArchive: true
+            
+            // Archive npm logs on failure for debugging
+            archiveArtifacts artifacts: '**/*.log', allowEmptyArchive: true
+            
             cleanWs()
         }
         success {
@@ -124,6 +131,8 @@ pipeline {
             sh 'npm --version || true'
             sh 'node --version || true'
             sh 'ls -la || true'
+            // List npm logs
+            sh 'find . -name "*.log" -type f | xargs ls -la || true'
         }
     }
 }
