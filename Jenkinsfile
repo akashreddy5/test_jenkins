@@ -103,7 +103,7 @@ pipeline {
         stage('Deploy to Dev') {
             when {
                 expression {
-                    return env.BRANCH_NAME == 'develop'
+                    return sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim() == 'develop'
                 }
             }
             steps {
@@ -117,7 +117,8 @@ pipeline {
         stage('Deploy to Production') {
             when {
                 expression {
-                    return ['main', 'master'].contains(env.BRANCH_NAME)
+                    def branch = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    return branch == 'main' || branch == 'master'
                 }
             }
             steps {
@@ -127,6 +128,7 @@ pipeline {
                 }
             }
         }
+
     }
 
     post {
