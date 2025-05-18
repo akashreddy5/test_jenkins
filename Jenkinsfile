@@ -18,7 +18,6 @@ pipeline {
 
     tools {
         nodejs 'Nodejs' // Node.js installation
-        tool name: 'SonarQube Scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation' // Correct SonarQube scanner tool type
     }
 
     stages {
