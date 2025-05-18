@@ -19,8 +19,8 @@ pipeline {
     }
 
     tools {
-        // Update to a more current Node.js version
-        nodejs 'Node18'
+        // Use an older Node.js version compatible with the system GLIBC
+        nodejs 'Node12'
     }
 
     stages {
@@ -32,9 +32,8 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Add error handling and a clean npm cache to resolve issues
+                // Use simple npm install without cache cleaning to avoid GLIBC issues
                 sh '''
-                    npm cache clean --force
                     npm install --no-fund --loglevel=warn || (echo "Retrying npm install..." && npm install --no-fund --loglevel=warn)
                 '''
             }
