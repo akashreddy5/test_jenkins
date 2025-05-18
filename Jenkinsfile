@@ -10,7 +10,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
-        SONAR_SERVER = 'http://18.212.218.156:9000/projects'
+        SONAR_SERVER = 'http://18.212.218.156:9000' // Corrected
         BRANCH_NAME = 'develop' // Will be set dynamically
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
@@ -77,13 +77,20 @@ pipeline {
             when {
                 expression { env.BRANCH_NAME == 'develop' }
             }
+            environment {
+                SONAR_TOKEN = credentials('sonar-token') // You must create this credential in Jenkins
+            }
             steps {
                 echo "Running SonarQube analysis on branch: ${env.BRANCH_NAME}"
-                // Replace with actual sonar-scanner command and credentials
-                sh '''
-                    echo "Pretending to run sonar-scanner..."
-                    # sonar-scanner -Dsonar.projectKey=my-react-app -Dsonar.sources=. -Dsonar.host.url=${SONAR_SERVER} -Dsonar.login=<SONAR_TOKEN>
-                '''
+                withSonarQubeEnv('MySonarQubeServer') {
+                    sh '''
+                        sonar-scanner \
+                          -Dsonar.projectKey=my-react-app \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=http://18.212.218.156:9000  \
+                          -Dsonar.login=${sonar}
+                    '''
+                }
             }
         }
 
