@@ -11,7 +11,7 @@ pipeline {
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
-        BRANCH_NAME = 'main' // Will be set dynamically
+        BRANCH_NAME = 'develop' // Will be set dynamically
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
