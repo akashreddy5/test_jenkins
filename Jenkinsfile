@@ -10,14 +10,14 @@ pipeline {
         AWS_REGION = 'us-east-1'
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
-        SONAR_SERVER = 'http://18.212.218.156:9000' // Corrected SonarQube Server URL
-        BRANCH_NAME = 'develop' // Will be set dynamically
+        SONAR_HOST_URL = 'http://18.212.218.156:9000'
+        BRANCH_NAME = 'develop' // Default value; updated dynamically later
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
 
     tools {
-        nodejs 'Nodejs' // Node.js installation
+        nodejs 'Nodejs'
     }
 
     stages {
@@ -78,18 +78,20 @@ pipeline {
                 expression { env.BRANCH_NAME == 'develop' }
             }
             environment {
-                SONAR_TOKEN = credentials('sonar') // Use the SonarQube token stored in Jenkins credentials
+                SONAR_TOKEN = credentials('sonar') // Credential ID for SonarQube token
             }
             steps {
                 echo "Running SonarQube analysis on branch: ${env.BRANCH_NAME}"
-                withSonarQubeEnv('MySonarQubeServer') { // Use the configured SonarQube server in Jenkins
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=my-react-app \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=${SONAR_SERVER} \
-                          -Dsonar.login=${SONAR_TOKEN}  // Use the SonarQube token here
-                    '''
+                withSonarQubeEnv('MySonarQubeServer') {
+                    withEnv(["PATH+SONAR_SCANNER=${tool 'SonarScanner'}/bin"]) {
+                        sh '''
+                            sonar-scanner \
+                              -Dsonar.projectKey=my-react-app \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=${SONAR_HOST_URL} \
+                              -Dsonar.login=${SONAR_TOKEN}
+                        '''
+                    }
                 }
             }
         }
