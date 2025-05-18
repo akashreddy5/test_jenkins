@@ -3,7 +3,6 @@ pipeline {
 
     options {
         timeout(time: 120, unit: 'MINUTES')
-        // Change durability setting to MAX_SURVIVABILITY to prevent FlowNode loading issues
         durabilityHint('MAX_SURVIVABILITY')
     }
 
@@ -12,32 +11,34 @@ pipeline {
         S3_BUCKET_DEV = 'my-react-app-devs'
         S3_BUCKET_PROD = 'my-react-app-prods'
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
-        // Get branch name safely
-        BRANCH_NAME = "${env.BRANCH_NAME ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()}"
-        // Set Node.js and npm executables path (combined into one PATH declaration)
+        BRANCH_NAME = '' // Will be set dynamically in Setup
         PATH = "${WORKSPACE}/node_modules/.bin:${tool 'Nodejs'}/bin:${env.PATH}"
-        // Set npm cache directory in workspace to avoid permission issues
         NPM_CONFIG_CACHE = "${WORKSPACE}/.npm-cache"
     }
 
     tools {
-        nodejs 'Nodejs'  // Updated to Node 16
+        nodejs 'Nodejs'
     }
 
     stages {
         stage('Setup') {
             steps {
+                script {
+                    env.BRANCH_NAME = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                    echo "Branch Name Detected: ${env.BRANCH_NAME}"
+                }
+
                 // Create cache directories
                 sh 'mkdir -p ${WORKSPACE}/.npm-cache'
-                
+
                 // Display environment info for debugging
                 sh 'node --version'
                 sh 'npm --version'
                 sh 'env | sort'
-                
+
                 // Clear npm cache to avoid corrupted packages
                 sh 'npm cache clean --force'
-                
+
                 // Check if package.json exists, create a basic one if it doesn't
                 sh '''
                     if [ ! -f package.json ]; then
@@ -53,16 +54,10 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Install project dependencies with retry and network timeout
                 retry(3) {
                     sh '''
-                        # First try npm install (skipping npm ci since package-lock.json might not exist)
-                        npm install --no-audit --no-fund --network-timeout=60000
-                        
-                        # Verify node_modules exists
+                        npm install --no-audit --no-fund
                         test -d node_modules || exit 1
-                        
-                        # Verify the project has basic React dependencies
                         node -e "require('react'); console.log('React installed successfully')" || 
                         npm install react react-dom react-scripts --no-audit --no-fund --save
                     '''
@@ -86,24 +81,18 @@ pipeline {
 
         stage('Build') {
             steps {
-                // Create a minimal React app structure if it doesn't exist
                 sh '''
                     if [ ! -d src ]; then
                         mkdir -p src public
-                        
-                        # Create basic index.html if it doesn't exist
                         if [ ! -f public/index.html ]; then
                             echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>React App</title></head><body><div id="root"></div></body></html>' > public/index.html
                         fi
-                        
-                        # Create basic index.js if it doesn't exist
                         if [ ! -f src/index.js ]; then
                             echo 'import React from "react"; import ReactDOM from "react-dom"; const App = () => <div>Hello World</div>; ReactDOM.render(<App />, document.getElementById("root"));' > src/index.js
                         fi
                     fi
                 '''
-                
-                // Use env.CI=false to prevent treating warnings as errors
+
                 sh '''
                     export CI=false
                     npm run build || npx react-scripts build
@@ -142,12 +131,8 @@ pipeline {
 
     post {
         always {
-            // Archive build artifacts before cleaning workspace
             archiveArtifacts artifacts: 'build/**/*', allowEmptyArchive: true
-            
-            // Archive npm logs on failure for debugging
             archiveArtifacts artifacts: '**/*.log', allowEmptyArchive: true
-            
             cleanWs()
         }
         success {
@@ -155,11 +140,9 @@ pipeline {
         }
         failure {
             echo 'Build failed!'
-            // Add diagnostic information on failure
             sh 'npm --version || true'
             sh 'node --version || true'
             sh 'ls -la || true'
-            // List npm logs
             sh 'find . -name "*.log" -type f | xargs ls -la || true'
         }
     }
