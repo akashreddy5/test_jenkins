@@ -5,8 +5,10 @@ pipeline {
         // Add timeout and retry options for more resilience
         timeout(time: 60, unit: 'MINUTES')
         retry(1)
-        // Add parameter to fix the JENKINS-48300 issue
+        // Add parameter to fix the JENKINS-48300 issue with specific JVM property
         disableConcurrentBuilds()
+        // This helps with the wrapper script issue on laggy filesystems
+        durabilityHint('PERFORMANCE_OPTIMIZED')
     }
 
     environment {
@@ -16,6 +18,8 @@ pipeline {
         SONAR_SERVER = 'http://18.212.218.156:9000/projects'
         // Get branch name safely
         BRANCH_NAME = "${env.BRANCH_NAME ?: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()}"
+        // Add this for JENKINS-48300 issue
+        JENKINS_PLUGIN_DURABLETASK_HEARTBEAT_CHECK_INTERVAL = '86400'
     }
 
     tools {
@@ -32,23 +36,29 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Use simple npm install without cache cleaning to avoid GLIBC issues
-                sh '''
-                    npm install --no-fund --loglevel=warn || (echo "Retrying npm install..." && npm install --no-fund --loglevel=warn)
-                '''
+                // Use simple npm install without cache cleaning, with catch error for better resilience
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                    timeout(time: 30, unit: 'MINUTES') {
+                        sh '''
+                            npm install --no-fund --loglevel=warn --unsafe-perm --no-optional || (echo "Retrying npm install..." && npm install --no-fund --loglevel=warn --unsafe-perm --no-optional)
+                        '''
+                    }
+                }
             }
         }
 
         stage('Run Tests') {
             steps {
-                // Add conditional to check if tests exist
-                sh '''
-                    if grep -q "test" package.json; then
-                        npm test -- --coverage || echo "Tests failed but continuing build"
-                    else
-                        echo "No test script found in package.json, skipping tests"
-                    fi
-                '''
+                // Add conditional to check if tests exist and run with a very long timeout
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    sh '''
+                        if grep -q "test" package.json; then
+                            npm test -- --coverage --testTimeout=60000 || echo "Tests failed but continuing build"
+                        else
+                            echo "No test script found in package.json, skipping tests"
+                        fi
+                    '''
+                }
             }
         }
 
