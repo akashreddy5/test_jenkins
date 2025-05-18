@@ -21,7 +21,7 @@ pipeline {
     }
 
     tools {
-        nodejs 'Node16'  // Updated to Node 16
+        nodejs 'Nodejs'  // Updated to Node 16
     }
 
     stages {
