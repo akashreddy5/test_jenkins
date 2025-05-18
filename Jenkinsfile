@@ -78,7 +78,7 @@ pipeline {
                 expression { env.BRANCH_NAME == 'develop' }
             }
             environment {
-                SONAR_TOKEN = credentials('sonar-token') // You must create this credential in Jenkins
+                SONAR_TOKEN = credentials('sonar') // You must create this credential in Jenkins
             }
             steps {
                 echo "Running SonarQube analysis on branch: ${env.BRANCH_NAME}"
